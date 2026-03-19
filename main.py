@@ -6,6 +6,7 @@ from ai import ai_move
 
 def main():
     board = create_board()
+    level = int(input("Vui lòng nhập độ khó muốn chơi (1-3): "))
 
     while True:
         # Lượt người chơi
@@ -29,7 +30,7 @@ def main():
             break
 
         # Lượt máy
-        ai_move_pos = ai_move(board)
+        ai_move_pos = ai_move(board, level)
         if ai_move_pos is None:
             print_board(board)
             print("Bàn cờ đã đầy. Kết quả hòa.")

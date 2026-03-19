@@ -1,6 +1,6 @@
 import random
 
-from constants import EMPTY, PLAYER, AI, WIN_SCORE
+from constants import EMPTY, PLAYER, AI, WIN_SCORE, EASY, MEDIUM, HARD
 from board import get_candidate_moves
 from rules import check_winner
 from evaluation import evaluate_board
@@ -20,6 +20,15 @@ def find_immediate_winning_moves(board, player):
         board[row][col] = EMPTY
 
     return winning_moves
+
+
+
+def ai_random_move(board):
+    candidate_moves= get_candidate_moves(board, distance=1)
+    if not candidate_moves:
+        return None
+
+    return random.choice(candidate_moves)
 
 
 def find_best_move_by_heuristic(board):
@@ -157,19 +166,14 @@ def find_best_move_by_minimax(board, depth):
     return None
 
 
-def ai_move(board):
-    return find_best_move_by_minimax(board, depth=3)
+def ai_move(board, level):
+    if level == EASY:
+        return ai_random_move(board)
+    elif level == MEDIUM:
+        return find_best_move_by_heuristic(board)
+    
+    return find_best_move_by_minimax(board, depth=2)
 
 
 
 
-# def ai_move(board):
-#     return find_best_move_by_heuristic(board)
-
-
-# def ai_random_move(board):
-#     candidate_moves= get_candidate_moves(board, distance=1)
-#     if not candidate_moves:
-#         return None
-
-#     return random.choice(candidate_moves)

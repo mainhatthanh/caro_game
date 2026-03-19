@@ -5,6 +5,11 @@ PLAYER = 1
 AI = - 1
 WIN_SCORE = 10**9
 
+
+EASY = 1
+MEDIUM = 2
+HARD = 3
+
 PATTERN_SCORES = {
     # 5 quân
     "FIVE": 1000000,    ## .MMMM.
