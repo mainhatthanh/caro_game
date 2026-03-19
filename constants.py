@@ -3,6 +3,7 @@ BOARD_SIZE = 15
 EMPTY = 0
 PLAYER = 1
 AI = - 1
+WIN_SCORE = 10**9
 
 PATTERN_SCORES = {
     # 5 quân

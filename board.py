@@ -53,7 +53,7 @@ def get_empty_cells(board):
     return empty_cells
 
 
-def has_neighbor(board, row, col, distance=1):
+def has_neighbor(board, row, col, distance):
     for dr in range(-distance, distance + 1):
         for dc in range(-distance, distance + 1):
             if dr == 0 and dc == 0:
@@ -69,7 +69,7 @@ def has_neighbor(board, row, col, distance=1):
     return False
 
 
-def get_candidate_moves(board, distance=1):
+def get_candidate_moves(board, distance=2):
     candidate_moves = []
 
     is_empty_board = True
