@@ -171,7 +171,7 @@ def ai_move(board, level):
         return ai_random_move(board)
     elif level == MEDIUM:
         return find_best_move_by_heuristic(board)
-    
+    #HARD
     return find_best_move_by_minimax(board, depth=2)
 
 
