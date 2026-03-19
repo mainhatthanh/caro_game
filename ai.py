@@ -31,38 +31,38 @@ def ai_random_move(board):
     return random.choice(candidate_moves)
 
 
-def find_best_move_by_heuristic(board):
-    candidate_moves = get_candidate_moves(board, distance=1)
+# def find_best_move_by_heuristic(board):
+#     candidate_moves = get_candidate_moves(board, distance=1)
 
-    if not candidate_moves:
-        return None
+#     if not candidate_moves:
+#         return None
 
-    # 1. AI có nước thắng ngay
-    ai_wins = find_immediate_winning_moves(board, AI)
-    if ai_wins:
-        return random.choice(ai_wins)
+#     # 1. AI có nước thắng ngay
+#     ai_wins = find_immediate_winning_moves(board, AI)
+#     if ai_wins:
+#         return random.choice(ai_wins)
 
-    # 2. Người chơi có nước thắng ngay thì chặn
-    player_wins = find_immediate_winning_moves(board, PLAYER)
-    if player_wins:
-        return random.choice(player_wins)
+#     # 2. Người chơi có nước thắng ngay thì chặn
+#     player_wins = find_immediate_winning_moves(board, PLAYER)
+#     if player_wins:
+#         return random.choice(player_wins)
 
-    # 3. Dùng heuristic
-    best_score = float("-inf")
-    best_moves = []
+#     # 3. Dùng heuristic
+#     best_score = float("-inf")
+#     best_moves = []
 
-    for row, col in candidate_moves:
-        board[row][col] = AI
-        score = evaluate_board(board)
-        board[row][col] = EMPTY
+#     for row, col in candidate_moves:
+#         board[row][col] = AI
+#         score = evaluate_board(board)
+#         board[row][col] = EMPTY
 
-        if score > best_score:
-            best_score = score
-            best_moves = [(row, col)]
-        elif score == best_score:
-            best_moves.append((row, col))
+#         if score > best_score:
+#             best_score = score
+#             best_moves = [(row, col)]
+#         elif score == best_score:
+#             best_moves.append((row, col))
 
-    return random.choice(best_moves)
+#     return random.choice(best_moves)
 
 
 
@@ -170,9 +170,9 @@ def ai_move(board, level):
     if level == EASY:
         return ai_random_move(board)
     elif level == MEDIUM:
-        return find_best_move_by_heuristic(board)
+        return find_best_move_by_minimax(board, depth=1)
     #HARD
-    return find_best_move_by_minimax(board, depth=2)
+    return find_best_move_by_minimax(board, depth=3)
 
 
 

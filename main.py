@@ -6,7 +6,7 @@ from ai import ai_move
 
 def main():
     board = create_board()
-    level = int(input("Vui lòng nhập độ khó muốn chơi (1-3): "))
+    level = int(input("Vui lòng nhập độ khó muốn chơi (1-2-3): "))
 
     while True:
         # Lượt người chơi
