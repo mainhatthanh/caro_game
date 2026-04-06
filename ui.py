@@ -118,6 +118,7 @@ class GameFrame(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
+        self.waiting_for_ai = False
 
         self.canvas = tk.Canvas(self, width=600, height=600, highlightthickness=0)
         self.canvas.pack(pady=10)
@@ -135,6 +136,7 @@ class GameFrame(tk.Frame):
 
         self.board = create_board()
         self.game_over = False
+        self.waiting_for_ai = False
 
         self.configure(bg=self.theme["bg"])
         self.canvas.config(bg=self.theme["board"])
@@ -221,11 +223,16 @@ class GameFrame(tk.Frame):
 
     def update_ui(self):
         self.draw()
-        if not self.game_over:
+        if self.game_over:
+            return
+        if self.waiting_for_ai:
+            self.status.config(text="AI is thinking...")
+        else:
             self.status.config(text="Your Turn (X)")
 
+
     def click(self, event):
-        if self.game_over:
+        if self.game_over or self.waiting_for_ai:
             return
 
         col = event.x // CELL_SIZE
@@ -236,9 +243,12 @@ class GameFrame(tk.Frame):
 
             if check_winner(self.board, PLAYER):
                 self.game_over = True
+                self.update_ui()
                 messagebox.showinfo("Game Over", "You Win!")
                 return
 
+            self.waiting_for_ai = True
+            self.update_ui()
             self.after(300, self.ai_turn)
 
     def ai_turn(self):
@@ -246,11 +256,16 @@ class GameFrame(tk.Frame):
         if move:
             r, c = move
             make_move(self.board, r, c, AI)
-            self.update_ui()
 
             if check_winner(self.board, AI):
                 self.game_over = True
+                self.waiting_for_ai = False
+                self.update_ui()
                 messagebox.showinfo("Game Over", "AI Wins!")
+                return
+
+        self.waiting_for_ai = False
+        self.update_ui()
 
     def back_menu(self):
         self.controller.show_frame(MenuFrame)

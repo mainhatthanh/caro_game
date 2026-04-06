@@ -24,12 +24,12 @@ def find_immediate_winning_moves(board, player):
 
 
 
-def ai_random_move(board):
-    candidate_moves= get_candidate_moves(board, distance=1)
-    if not candidate_moves:
-        return None
+# def ai_random_move(board):
+#     candidate_moves= get_candidate_moves(board, distance=1)
+#     if not candidate_moves:
+#         return None
 
-    return random.choice(candidate_moves)
+#     return random.choice(candidate_moves)
 
 
 
@@ -205,9 +205,9 @@ def find_best_move_by_minimax(board, depth):
 
 def ai_move(board, level):
     if level == EASY:
-        return ai_random_move(board)
-    elif level == MEDIUM:
         return find_best_move_by_minimax(board, depth=1)
+    elif level == MEDIUM:
+        return find_best_move_by_minimax(board, depth=2)
     #HARD
     return find_best_move_by_minimax(board, depth=3)
 
