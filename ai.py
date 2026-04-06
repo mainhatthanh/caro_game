@@ -1,10 +1,16 @@
 import random
 
-from constants import EMPTY, PLAYER, AI, WIN_SCORE, EASY, MEDIUM, HARD
+from constants import EMPTY, PLAYER, AI, WIN_SCORE, EASY, MEDIUM, HARD, MAX_DEPTH
 from board import get_candidate_moves
-from rules import check_winner
+from rules import check_winner, is_board_full
 from evaluation import evaluate_board
-from rules import is_board_full
+
+killer_moves = {d: [] for d in range(MAX_DEPTH + 1)}
+MAX_ORDERED_MOVES = {
+    3: 12,
+    2: 10,
+    1: 8,
+}
 
 
 def find_immediate_winning_moves(board, player):
@@ -31,38 +37,73 @@ def ai_random_move(board):
     return random.choice(candidate_moves)
 
 
-# def find_best_move_by_heuristic(board):
-#     candidate_moves = get_candidate_moves(board, distance=1)
 
-#     if not candidate_moves:
-#         return None
+def score_move_for_ordering(board, row, col, player, depth):
+    move = (row, col)
+    killer_bonus = 10**8 if move in killer_moves.get(depth, []) else 0
 
-#     # 1. AI có nước thắng ngay
-#     ai_wins = find_immediate_winning_moves(board, AI)
-#     if ai_wins:
-#         return random.choice(ai_wins)
+    board[row][col] = player
+    if check_winner(board, player):
+        board[row][col] = EMPTY
+        return 10**9 + killer_bonus
+    board[row][col] = EMPTY
 
-#     # 2. Người chơi có nước thắng ngay thì chặn
-#     player_wins = find_immediate_winning_moves(board, PLAYER)
-#     if player_wins:
-#         return random.choice(player_wins)
+    ally_neighbors = 0
+    opponent_neighbors = 0
+    center = len(board) // 2
 
-#     # 3. Dùng heuristic
-#     best_score = float("-inf")
-#     best_moves = []
+    for dr in range(-1, 2):
+        for dc in range(-1, 2):
+            if dr == 0 and dc == 0:
+                continue
 
-#     for row, col in candidate_moves:
-#         board[row][col] = AI
-#         score = evaluate_board(board)
-#         board[row][col] = EMPTY
+            nr = row + dr
+            nc = col + dc
+            if 0 <= nr < len(board) and 0 <= nc < len(board):
+                if board[nr][nc] == player:
+                    ally_neighbors += 1
+                elif board[nr][nc] != EMPTY:
+                    opponent_neighbors += 1
 
-#         if score > best_score:
-#             best_score = score
-#             best_moves = [(row, col)]
-#         elif score == best_score:
-#             best_moves.append((row, col))
+    center_bonus = max(0, center - abs(row - center) - abs(col - center))
+    return killer_bonus + ally_neighbors * 10 + opponent_neighbors * 6 + center_bonus
 
-#     return random.choice(best_moves)
+
+def order_moves(board, candidate_moves, player, depth):
+    scored_moves = []
+
+    for row, col in candidate_moves:
+        score = score_move_for_ordering(board, row, col, player, depth)
+
+        #ưu tiên killer_move
+    
+
+        scored_moves.append(((row, col), score))
+
+    #AI muốn điểm cao trước
+    if player == AI:
+        scored_moves.sort(key=lambda x: x[1], reverse=True)
+    else:
+        #Người chơi muốn điểm thấp trước
+        scored_moves.sort(key=lambda x: x[1], reverse=True)
+
+    ordered_moves = [move for move, score in scored_moves]
+    max_moves = MAX_ORDERED_MOVES.get(depth)
+    if max_moves is not None and len(ordered_moves) > max_moves:
+        return ordered_moves[:max_moves]
+    return ordered_moves
+
+def add_killer_move(depth, move):
+    if move in killer_moves[depth]:
+        return
+    
+    killer_moves[depth].insert(0, move)
+
+    #Giữ tối đa 2 killer moves cho mỗi depth
+    if len(killer_moves[depth]) > 2:
+        killer_moves[depth].pop()
+
+
 
 
 
@@ -78,7 +119,7 @@ def minimax(board, depth, maximizing, alpha, beta):
         return 0
     
     #2. Nếu đạt độ sâu giới hạn, dùng heuristic
-    if depth == 0:
+    if depth <= 0:
         return evaluate_board(board)
     
     candidate_moves = get_candidate_moves(board, distance=1)
@@ -88,6 +129,7 @@ def minimax(board, depth, maximizing, alpha, beta):
     
     #3. Nếu là lượt AI
     if maximizing:
+        candidate_moves = order_moves(board, candidate_moves, AI, depth)
         best_value = float("-inf")
 
         for row, col in candidate_moves:
@@ -103,12 +145,14 @@ def minimax(board, depth, maximizing, alpha, beta):
 
             # Alpha-Beta pruning
             if alpha >= beta:
+                add_killer_move(depth, (row, col))
                 break
 
         return best_value
     
     #4. Nếu là người chơi
     else:
+        candidate_moves = order_moves(board, candidate_moves, PLAYER, depth)
         best_value = float("inf")
 
         for row, col in candidate_moves:
@@ -124,6 +168,7 @@ def minimax(board, depth, maximizing, alpha, beta):
 
             #Alpha-beta pruning
             if alpha >= beta:
+                add_killer_move(depth, (row, col))
                 break
 
         return best_value
@@ -145,6 +190,8 @@ def find_best_move_by_minimax(board, depth):
     player_wins = find_immediate_winning_moves(board, PLAYER)
     if player_wins:
         return random.choice(player_wins)
+
+    candidate_moves = order_moves(board, candidate_moves, AI, depth)
 
     best_score = float("-inf")
     best_moves = []

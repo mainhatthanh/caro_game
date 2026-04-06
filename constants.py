@@ -4,7 +4,7 @@ EMPTY = 0
 PLAYER = 1
 AI = - 1
 WIN_SCORE = 10**9
-
+MAX_DEPTH = 5
 
 EASY = 1
 MEDIUM = 2
