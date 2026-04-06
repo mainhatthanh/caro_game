@@ -6,11 +6,6 @@ from rules import check_winner, is_board_full
 from evaluation import evaluate_board
 
 killer_moves = {d: [] for d in range(MAX_DEPTH + 1)}
-MAX_ORDERED_MOVES = {
-    3: 12,
-    2: 10,
-    1: 8,
-}
 
 
 def find_immediate_winning_moves(board, player):
@@ -38,7 +33,7 @@ def ai_random_move(board):
 
 
 
-def score_move_for_ordering(board, row, col, player, depth):
+def evaluate_for_ordering_move(board, row, col, player, depth):
     move = (row, col)
     killer_bonus = 10**8 if move in killer_moves.get(depth, []) else 0
 
@@ -73,11 +68,9 @@ def order_moves(board, candidate_moves, player, depth):
     scored_moves = []
 
     for row, col in candidate_moves:
-        score = score_move_for_ordering(board, row, col, player, depth)
+        score = evaluate_for_ordering_move(board, row, col, player, depth)
 
         #ưu tiên killer_move
-    
-
         scored_moves.append(((row, col), score))
 
     #AI muốn điểm cao trước
@@ -88,9 +81,6 @@ def order_moves(board, candidate_moves, player, depth):
         scored_moves.sort(key=lambda x: x[1], reverse=True)
 
     ordered_moves = [move for move, score in scored_moves]
-    max_moves = MAX_ORDERED_MOVES.get(depth)
-    if max_moves is not None and len(ordered_moves) > max_moves:
-        return ordered_moves[:max_moves]
     return ordered_moves
 
 def add_killer_move(depth, move):
@@ -220,7 +210,6 @@ def ai_move(board, level):
         return find_best_move_by_minimax(board, depth=1)
     #HARD
     return find_best_move_by_minimax(board, depth=3)
-
 
 
 
