@@ -1,35 +1,6 @@
 from constants import BOARD_SIZE, EMPTY, PLAYER, AI, PATTERN_SCORES
 
 
-def count_overlapping(line, pattern):
-    count = 0
-    start = 0
-
-    while True:
-        idx = line.find(pattern, start)
-        if idx == -1:
-            break
-        count += 1
-        start = idx + 1
-
-    return count
-
-
-def normalize_line(line, player):
-    chars = ["#"]
-
-    for cell in line:
-        if cell == EMPTY:
-            chars.append(".")
-        elif cell == player:
-            chars.append("M")
-        else:
-            chars.append("E")
-
-    chars.append("#")
-    return "".join(chars)
-
-
 def get_all_lines(board):
     lines = []
 
@@ -86,90 +57,92 @@ def get_all_lines(board):
     return lines
 
 
+def _run_side(line, idx, player):
+    """Return '.' for EMPTY, 'E' for opponent, '#' for wall."""
+    if idx < 0 or idx >= len(line):
+        return '#'
+    cell = line[idx]
+    if cell == EMPTY:
+        return '.'
+    if cell == player:
+        return None  # part of the run, shouldn't happen
+    return 'E'
+
+
 def evaluate_line_for_player(line, player):
-    s = normalize_line(line, player)
+    """Score a single line using run-length analysis.
+    Replaces the old 49-pattern string matching with O(len(line)) scan."""
+    n = len(line)
     score = 0
 
-    score += count_overlapping(s, ".MMMMM.") * PATTERN_SCORES["FIVE"]
-    score += count_overlapping(s, "#MMMMM.") * PATTERN_SCORES["FIVE"]
-    score += count_overlapping(s, ".MMMMM#") * PATTERN_SCORES["FIVE"]
+    # Phase 1: find all runs of player stones
+    runs = []
+    i = 0
+    while i < n:
+        if line[i] == player:
+            start = i
+            while i < n and line[i] == player:
+                i += 1
+            runs.append((start, i - start))
+        else:
+            i += 1
 
-    score += count_overlapping(s, ".MMMM.") * PATTERN_SCORES["OPEN_FOUR"]
+    if not runs:
+        return 0
 
-    score += count_overlapping(s, "EMMMM.") * PATTERN_SCORES["SEMI_OPEN_FOUR"]
-    score += count_overlapping(s, ".MMMME") * PATTERN_SCORES["SEMI_OPEN_FOUR"]
-    score += count_overlapping(s, "#MMMM.") * PATTERN_SCORES["SEMI_OPEN_FOUR"]
-    score += count_overlapping(s, ".MMMM#") * PATTERN_SCORES["SEMI_OPEN_FOUR"]
+    # Phase 2: score single runs
+    for start, length in runs:
+        left = _run_side(line, start - 1, player)
+        right = _run_side(line, start + length, player)
 
-    broken_four_patterns = [
-        ".MMM.M.",
-        ".MM.MM.",
-        ".M.MMM."
-    ]
-    for p in broken_four_patterns:
-        score += count_overlapping(s, p) * PATTERN_SCORES["BROKEN_FOUR"]
+        both_open = (left == '.' and right == '.')
+        one_open = (left == '.') != (right == '.')
 
-    semi_broken_four_patterns = [
-        "EMMM.M.",
-        ".MMM.ME",
-        "EMM.MM.",
-        ".MM.MME",
-        "EM.MMM.",
-        ".M.MMME",
-        "#MMM.M.",
-        ".MMM.M#",
-        "#MM.MM.",
-        ".MM.MM#",
-        "#M.MMM.",
-        ".M.MMM#"
-    ]
-    for p in semi_broken_four_patterns:
-        score += count_overlapping(s, p) * PATTERN_SCORES["SEMI_BROKEN_FOUR"]
+        if length >= 5:
+            # Only score FIVE when at least one side is open
+            # (having 5+ blocked on both sides means wall-wall = 0 FIVE)
+            if left != 'E' and right != 'E' and (left == '.' or right == '.'):
+                score += PATTERN_SCORES["FIVE"]
+        elif length == 4:
+            if both_open:          score += PATTERN_SCORES["OPEN_FOUR"]
+            elif one_open:         score += PATTERN_SCORES["SEMI_OPEN_FOUR"]
+        elif length == 3:
+            if both_open:          score += PATTERN_SCORES["OPEN_THREE"]
+            elif one_open:         score += PATTERN_SCORES["SEMI_OPEN_THREE"]
+        elif length == 2:
+            if both_open:          score += PATTERN_SCORES["OPEN_TWO"]
+            elif one_open:         score += PATTERN_SCORES["SEMI_OPEN_TWO"]
+        elif length == 1:
+            if both_open:          score += PATTERN_SCORES["OPEN_ONE"]
 
-    score += count_overlapping(s, ".MMM.") * PATTERN_SCORES["OPEN_THREE"]
+    # Phase 3: broken patterns (2 runs separated by exactly 1 empty cell)
+    for ri in range(len(runs) - 1):
+        start1, len1 = runs[ri]
+        start2, len2 = runs[ri + 1]
+        gap = start2 - (start1 + len1)
 
-    broken_three_patterns = [
-        ".MM.M.",
-        ".M.MM."
-    ]
-    for p in broken_three_patterns:
-        score += count_overlapping(s, p) * PATTERN_SCORES["BROKEN_THREE"]
+        if gap != 1:
+            continue
+        if line[start1 + len1] != EMPTY:
+            continue
 
-    semi_open_three_patterns = [
-        "EMMM.",
-        ".MMME",
-        "#MMM.",
-        ".MMM#",
-        "EMM.M.",
-        ".MM.ME",
-        "EM.MM.",
-        ".M.MME",
-        "#MM.M.",
-        ".MM.M#",
-        "#M.MM.",
-        ".M.MM#"
-    ]
-    for p in semi_open_three_patterns:
-        score += count_overlapping(s, p) * PATTERN_SCORES["SEMI_OPEN_THREE"]
+        total = len1 + len2
 
-    score += count_overlapping(s, ".MM.") * PATTERN_SCORES["OPEN_TWO"]
+        left = _run_side(line, start1 - 1, player)
+        right = _run_side(line, start2 + len2, player)
 
-    score += count_overlapping(s, ".M.M.") * PATTERN_SCORES["BROKEN_TWO"]
+        both_open = (left == '.' and right == '.')
+        one_open = (left == '.') != (right == '.')
 
-    semi_open_two_patterns = [
-        "EMM.",
-        ".MME",
-        "#MM.",
-        ".MM#",
-        "EM.M.",
-        ".M.ME",
-        "#M.M.",
-        ".M.M#"
-    ]
-    for p in semi_open_two_patterns:
-        score += count_overlapping(s, p) * PATTERN_SCORES["SEMI_OPEN_TWO"]
-
-    score += count_overlapping(s, ".M.") * PATTERN_SCORES["OPEN_ONE"]
+        if total == 4:
+            if both_open:          score += PATTERN_SCORES["BROKEN_FOUR"]
+            elif one_open:         score += PATTERN_SCORES["SEMI_BROKEN_FOUR"]
+        elif total == 3:
+            if both_open:          score += PATTERN_SCORES["BROKEN_THREE"]
+            elif one_open:         score += PATTERN_SCORES["SEMI_OPEN_THREE"]
+        elif total == 2:
+            if both_open:          score += PATTERN_SCORES["BROKEN_TWO"]
+            elif one_open:         score += PATTERN_SCORES["SEMI_OPEN_TWO"]
 
     return score
 
@@ -189,3 +162,69 @@ def evaluate_board(board):
     player_score = evaluate_player(board, PLAYER)
 
     return ai_score - 1.5 * player_score
+
+DIRECTIONS = [(0, 1), (1, 0), (1, 1), (1, -1)]
+
+def get_lines_through(board, row, col, extend=5):
+    """Return the 4 line segments passing through (row, col), each extended
+    `extend` cells in both directions (clamped to board bounds).
+    The cell at (row, col) is included at its current value.
+    Returns list of (segment, stone_idx) tuples — stone_idx is the position
+    of the (row, col) stone within the segment."""
+    lines = []
+    for dr, dc in DIRECTIONS:
+        segment = []
+        # Backward from (row, col)
+        r, c = row - dr, col - dc
+        for _ in range(extend):
+            if 0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE:
+                segment.insert(0, board[r][c])
+            r -= dr
+            c -= dc
+        stone_idx = len(segment)  # the stone goes right after backward cells
+        # The cell itself
+        segment.append(board[row][col])
+        # Forward from (row, col)
+        r, c = row + dr, col + dc
+        for _ in range(extend):
+            if 0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE:
+                segment.append(board[r][c])
+            r += dr
+            c += dc
+        if len(segment) >= 5:
+            lines.append((segment, stone_idx))
+    return lines
+
+
+def evaluate_position_score(board, row, col):
+    """Evaluate the contribution of the 4 lines through (row, col) to the total
+    board score (ai_score - 1.5 * player_score)."""
+    lines = get_lines_through(board, row, col)
+    total = 0
+    for segment, _stone_idx in lines:
+        total += evaluate_line_for_player(segment, AI)
+        total -= 1.5 * evaluate_line_for_player(segment, PLAYER)
+    return total
+
+
+def compute_move_delta(board, row, col, player):
+    """Compute the change in total board score if `player` is placed at (row, col).
+    Does NOT modify the board.
+    Only evaluates the 4 lines through (row, col) once each, for both players,
+    avoiding double evaluation."""
+    lines = get_lines_through(board, row, col)
+    delta = 0
+    for segment, stone_idx in lines:
+        # Before: player has '.' at position (blocked), opponent has '.' at position
+        # After:  player has 'M' at position, opponent has 'E' at position
+        # Recompute for BOTH and subtract old, all in one pass
+        old_ai = evaluate_line_for_player(segment, AI)
+        old_player = evaluate_line_for_player(segment, PLAYER)
+        # Temporarily place the stone for new eval
+        saved = segment[stone_idx]
+        segment[stone_idx] = player
+        new_ai = evaluate_line_for_player(segment, AI)
+        new_player = evaluate_line_for_player(segment, PLAYER)
+        segment[stone_idx] = saved
+        delta += (new_ai - old_ai) - 1.5 * (new_player - old_player)
+    return delta

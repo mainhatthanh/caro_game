@@ -1,0 +1,6 @@
+__pycache__
+/.claude
+/.venv
+/.pytest_cache
+/.vscode
+/.understand-anything

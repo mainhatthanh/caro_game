@@ -85,9 +85,18 @@ def get_candidate_moves(board, distance=2):
         center = BOARD_SIZE // 2
         return [(center, center)]
 
+    candidates = set()
     for row in range(BOARD_SIZE):
         for col in range(BOARD_SIZE):
-            if board[row][col] == EMPTY and has_neighbor(board, row, col, distance):
-                candidate_moves.append((row, col))
+            if board[row][col] == EMPTY:
+                continue
+            for dr in range(-distance, distance + 1):
+                for dc in range(-distance, distance + 1):
+                    if dr == 0 and dc == 0:
+                        continue
+                    nr = row + dr
+                    nc = col + dc
+                    if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and board[nr][nc] == EMPTY:
+                        candidates.add((nr, nc))
 
-    return candidate_moves
+    return list(candidates)
