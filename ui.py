@@ -1,3 +1,13 @@
+"""Caro Game Desktop GUI — Tkinter application with difficulty selection and themed play.
+
+The GUI has two screens:
+1. MenuFrame: gradient background with 3 difficulty buttons (Easy/Medium/Hard)
+2. GameFrame: board grid, stone rendering, AI turn handling
+
+Game flow: player clicks → stone placed → check win → after(300ms) AI responds
+The 300ms delay allows the UI to redraw the player's stone before AI calculation.
+"""
+
 import tkinter as tk
 from tkinter import messagebox
 from constants import BOARD_SIZE, PLAYER, AI, EASY, MEDIUM, HARD
@@ -7,14 +17,23 @@ from ai import ai_move
 
 CELL_SIZE = 600 // BOARD_SIZE
 
+# Theme colors per difficulty — each has own palette for visual distinction
 THEMES = {
     EASY: {"bg": "#1f2f1f", "board": "#2e4d2e", "grid": "#88cc88", "x": "#00ff88", "o": "#ffffff"},
     MEDIUM: {"bg": "#1e1e2f", "board": "#2b2b3c", "grid": "#6666aa", "x": "#4da6ff", "o": "#ffffff"},
     HARD: {"bg": "#2a1a1a", "board": "#3b1f1f", "grid": "#ff5555", "x": "#ff4d4d", "o": "#ffffff"}
 }
 
-# ================= APP =================
+
+# ================= APPLICATION ROOT =================
+
 class CaroApp(tk.Tk):
+    """Root window managing navigation between MenuFrame and GameFrame.
+
+    Uses tkraise() to switch frames without destroying/recreating them,
+    preserving game state when returning to the menu.
+    """
+
     def __init__(self):
         super().__init__()
         self.title("Caro Game Pro")
@@ -34,15 +53,23 @@ class CaroApp(tk.Tk):
         self.show_frame(MenuFrame)
 
     def show_frame(self, frame_class):
+        """Bring the specified frame to the front (tkraise pattern)."""
         self.frames[frame_class].tkraise()
 
     def start_game(self, difficulty):
+        """Start a new game with the chosen difficulty and switch to GameFrame."""
         self.frames[GameFrame].start_new_game(difficulty)
         self.show_frame(GameFrame)
 
 
-# ================= MENU =================
+# ================= MENU SCREEN =================
+
 class MenuFrame(tk.Frame):
+    """Main menu with gradient background and 3 difficulty buttons.
+
+    Each button has hover highlight and click → controller.start_game().
+    """
+
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
@@ -67,6 +94,7 @@ class MenuFrame(tk.Frame):
         self.create_button(350, 480, "Hard", HARD, "#f44336")
 
     def draw_gradient(self):
+        """Draw a vertical gradient background (dark blue-ish top to bottom)."""
         for i in range(800):
             r = int(20 + i * 0.05)
             g = 20
@@ -75,6 +103,7 @@ class MenuFrame(tk.Frame):
             self.canvas.create_line(0, i, 700, i, fill=color)
 
     def lighten(self, color):
+        """Lighten a hex color by 40 per channel (for hover effect)."""
         color = color.lstrip('#')
         r, g, b = [int(color[i:i+2], 16) for i in (0, 2, 4)]
         r = min(255, r + 40)
@@ -83,6 +112,11 @@ class MenuFrame(tk.Frame):
         return f'#{r:02x}{g:02x}{b:02x}'
 
     def create_button(self, x, y, text, value, color):
+        """Create a rounded-rectangle button on the menu canvas.
+
+        Binds hover (Enter/Leave) and click events to both the rectangle
+        and the text, so clicking anywhere on the button triggers the action.
+        """
         w, h = 260, 60
 
         rect = self.canvas.create_rectangle(
@@ -113,8 +147,21 @@ class MenuFrame(tk.Frame):
             self.canvas.tag_bind(item, "<Button-1>", on_click)
 
 
-# ================= GAME =================
+# ================= GAME SCREEN =================
+
 class GameFrame(tk.Frame):
+    """Game board with click handling, AI turn, and themed rendering.
+
+    Drawing:
+    - Grid lines on a Canvas (600x600 px)
+    - PLAYER (1) stones as X marks colored per theme
+    - AI (-1) stones as circles (white oval outline per theme)
+
+    Flow:
+    click → make_move() → check_winner() → after(300, ai_turn)
+    The after() gives the UI time to redraw before AI computes.
+    """
+
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
@@ -126,11 +173,12 @@ class GameFrame(tk.Frame):
         self.status = tk.Label(self, font=("Segoe UI", 12))
         self.status.pack()
 
-        self.back_btn_canvas = None  # để recreate mỗi game
+        self.back_btn_canvas = None  # recreated per game
 
         self.canvas.bind("<Button-1>", self.click)
 
     def start_new_game(self, difficulty):
+        """Reset board, apply theme, and redraw for a new game."""
         self.difficulty = difficulty
         self.theme = THEMES[difficulty]
 
@@ -142,15 +190,17 @@ class GameFrame(tk.Frame):
         self.canvas.config(bg=self.theme["board"])
         self.status.config(bg=self.theme["bg"], fg="white")
 
-        # tạo lại nút back
+        # Recreate back button (destroyed when returning to menu)
         if self.back_btn_canvas:
             self.back_btn_canvas.destroy()
         self.create_back_button()
 
         self.update_ui()
 
-    # ===== BACK BUTTON PRO =====
+    # ===== BACK BUTTON =====
+
     def create_back_button(self):
+        """Create the "← Back to Menu" button below the board."""
         self.back_btn_canvas = tk.Canvas(
             self,
             width=220,
@@ -193,16 +243,25 @@ class GameFrame(tk.Frame):
             self.back_btn_canvas.tag_bind(item, "<Leave>", on_leave)
             self.back_btn_canvas.tag_bind(item, "<Button-1>", on_click)
 
-    # ===== DRAW =====
+    # ===== BOARD RENDERING =====
+
     def draw(self):
+        """Redraw the entire board: grid lines + all placed stones.
+
+        PLAYER (1) → X mark (two diagonal lines)
+        AI (-1)    → Oval (circle)
+        Both are colored per the current theme.
+        """
         self.canvas.delete("all")
 
+        # Grid lines (BOARD_SIZE+1 lines in each direction)
         for i in range(BOARD_SIZE + 1):
             self.canvas.create_line(i * CELL_SIZE, 0, i * CELL_SIZE, 600,
                                     fill=self.theme["grid"])
             self.canvas.create_line(0, i * CELL_SIZE, 600, i * CELL_SIZE,
                                     fill=self.theme["grid"])
 
+        # Stones
         pad = CELL_SIZE // 4
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
@@ -212,16 +271,19 @@ class GameFrame(tk.Frame):
                 y2 = (r + 1) * CELL_SIZE - pad
 
                 if self.board[r][c] == PLAYER:
+                    # X shape: two crossing lines
                     self.canvas.create_line(x1, y1, x2, y2,
                                             fill=self.theme["x"], width=3)
                     self.canvas.create_line(x1, y2, x2, y1,
                                             fill=self.theme["x"], width=3)
 
                 elif self.board[r][c] == AI:
+                    # O shape: oval with outline
                     self.canvas.create_oval(x1, y1, x2, y2,
                                             outline=self.theme["o"], width=3)
 
     def update_ui(self):
+        """Redraw and update the status label based on game state."""
         self.draw()
         if self.game_over:
             return
@@ -230,8 +292,14 @@ class GameFrame(tk.Frame):
         else:
             self.status.config(text="Your Turn (X)")
 
+    # ===== CLICK HANDLING =====
 
     def click(self, event):
+        """Handle a mouse click on the board.
+
+        Converts pixel coordinates to board coordinates, places the stone,
+        checks for win/draw, and schedules the AI turn if the game continues.
+        """
         if self.game_over or self.waiting_for_ai:
             return
 
@@ -249,9 +317,11 @@ class GameFrame(tk.Frame):
 
             self.waiting_for_ai = True
             self.update_ui()
+            # 300ms delay so the UI redraws the player's stone before AI computes
             self.after(300, self.ai_turn)
 
     def ai_turn(self):
+        """Calculate and execute the AI move, then check for win/draw."""
         move = ai_move(self.board, self.difficulty)
         if move:
             r, c = move
@@ -268,10 +338,12 @@ class GameFrame(tk.Frame):
         self.update_ui()
 
     def back_menu(self):
+        """Return to the main menu."""
         self.controller.show_frame(MenuFrame)
 
 
 # ================= RUN =================
+
 if __name__ == "__main__":
     app = CaroApp()
     app.mainloop()

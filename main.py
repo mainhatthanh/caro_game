@@ -1,3 +1,18 @@
+"""Console-based Caro game — player vs AI in the terminal.
+
+The player plays as X, the AI plays as O. Game alternates turns:
+1. Player enters row and column
+2. Board is displayed
+3. AI responds
+4. Board is displayed
+5. Repeat until win or draw
+
+Difficulty maps to AI search depth:
+- Easy = depth 1 (very weak, basically random)
+- Medium = depth 2
+- Hard = depth 3-5 (with iterative deepening)
+"""
+
 from constants import PLAYER, AI
 from board import create_board, print_board, make_move, get_player_move
 from rules import check_winner, is_board_full
@@ -9,7 +24,7 @@ def main():
     level = int(input("Vui lòng nhập độ khó muốn chơi (1-2-3): "))
 
     while True:
-        # Lượt người chơi
+        # ----- Player's turn -----
         print_board(board)
         row, col = get_player_move()
 
@@ -29,7 +44,7 @@ def main():
             print("Bàn cờ đã đầy. Kết quả hòa.")
             break
 
-        # Lượt máy
+        # ----- AI's turn -----
         ai_move_pos = ai_move(board, level)
         if ai_move_pos is None:
             print_board(board)

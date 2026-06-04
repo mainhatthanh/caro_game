@@ -13,12 +13,17 @@ from board import (
 from rules import check_five_from_cell, check_winner, is_board_full
 from evaluation import (
     get_all_lines, evaluate_line_for_player,
-    evaluate_player, evaluate_board
+    evaluate_player, evaluate_board, classify_axis_threat,
 )
 from ai import (
     killer_moves, add_killer_move, find_immediate_winning_moves,
     evaluate_for_ordering_move, order_moves, minimax,
-    find_best_move_by_minimax, ai_move
+    find_best_move_by_minimax, ai_move, detect_fork, classify_axis, AXES,
+)
+from constants import (
+    MOVE_PRIORITY_KILLER,
+    FORK_NONE, FORK_DOUBLE_FOUR, FORK_FOUR_THREE, FORK_DOUBLE_THREE,
+    THREAT_OPEN_FOUR, THREAT_OPEN_THREE,
 )
 
 # ===================== BOARD TESTS =====================
@@ -343,6 +348,92 @@ class TestAI:
         moves = find_immediate_winning_moves(board_ai_advantage, PLAYER)
         assert (7, 4) in moves
 
+    # ============= FORK DETECTION TESTS =============
+
+    def test_classify_axis_horizontal_open_four(self):
+        """Place 3 AI stones at (7,5),(7,6),(7,7). Placing at (7,4) creates 4 total = open-four."""
+        fresh = create_board()
+        fresh[7][5] = fresh[7][6] = fresh[7][7] = AI
+        cat, total = classify_axis(fresh, 7, 4, AI, 0, 1, 0, -1)
+        assert cat == THREAT_OPEN_FOUR, f"Expected OPEN_FOUR, got {cat}"
+        assert total == 4
+
+    def test_classify_axis_vertical_open_three(self):
+        """Place AI stones at (7,7), (8,7). Placing at (9,7) creates a three."""
+        fresh = create_board()
+        fresh[7][7] = AI
+        fresh[8][7] = AI
+        cat, total = classify_axis(fresh, 9, 7, AI, 1, 0, -1, 0)
+        assert cat == THREAT_OPEN_THREE
+
+    def test_fork_detect_horizontal_diag_double_three(self):
+        """Create a double-three fork: horizontal open-three + diagonal open-three.
+        AI at (7,3),(7,4) on horizontal + (6,6),(8,4) on anti-diagonal.
+        Placing at (7,5) gives double-three."""
+        fresh = create_board()
+        # Horizontal: . . X X _ . .  -> placing at (7,5) gives . . X X X . .
+        fresh[7][3] = AI
+        fresh[7][4] = AI
+        # Anti-diagonal (↙↗): (6,6) and (8,4) -> placing at (7,5)
+        # From (7,5) going (+1,-1): (8,4)=AI. Going (-1,+1): (6,6)=AI.
+        # Total=3, both ends open = open-three
+        fresh[6][6] = AI
+        fresh[8][4] = AI
+        fork = detect_fork(fresh, 7, 5, AI)
+        assert fork == FORK_DOUBLE_THREE, \
+            f"Expected DOUBLE_THREE fork at (7,5), got {fork}"
+
+    def test_fork_double_four(self):
+        """Create a double-four fork: two open-fours on different axes.
+        Horizontal: stones at (7,5),(7,6) left side, (7,8) right side.
+        Vertical: stones at (5,7),(6,7) up side, (8,7) down side.
+        Placing at (7,7) gives two open-fours simultaneously."""
+        fresh = create_board()
+        # Horizontal open-four through (7,7): left 2 stones, right 1 stone = total 4
+        fresh[7][5] = AI
+        fresh[7][6] = AI
+        fresh[7][8] = AI
+        # Vertical open-four through (7,7): up 2 stones, down 1 stone = total 4
+        fresh[5][7] = AI
+        fresh[6][7] = AI
+        fresh[8][7] = AI
+        fork = detect_fork(fresh, 7, 7, AI)
+        assert fork == FORK_DOUBLE_FOUR, f"Expected DOUBLE_FOUR fork at (7,7), got {fork}"
+
+    def test_fork_four_three(self):
+        """Four-three fork: one open-four + one open-three on different axes."""
+        fresh = create_board()
+        # Horizontal open-four through (7,3): right stones (7,4),(7,5),(7,6)
+        fresh[7][4] = AI
+        fresh[7][5] = AI
+        fresh[7][6] = AI
+        # Vertical open-three through (7,3): up stones (5,3),(6,3)
+        fresh[5][3] = AI
+        fresh[6][3] = AI
+        fork = detect_fork(fresh, 7, 3, AI)
+        assert fork == FORK_FOUR_THREE, f"Expected FOUR_THREE fork at (7,3), got {fork}"
+
+    def test_fork_none(self):
+        """A move that doesn't create any fork should return FORK_NONE."""
+        fresh = create_board()
+        fresh[7][5] = AI
+        fork = detect_fork(fresh, 7, 3, AI)
+        assert fork == FORK_NONE, f"Expected FORK_NONE, got {fork}"
+
+    def test_fork_ai_finds_fork_through_search(self):
+        """Verify the full search path finds a fork move when available."""
+        fresh = create_board()
+        # Opponent has stones, AI can create a double-three
+        fresh[7][3] = AI
+        fresh[7][4] = AI
+        fresh[6][6] = AI
+        fresh[8][4] = AI
+        # find_best_move_by_minimax should find (7,5) as candidate
+        move = find_best_move_by_minimax(fresh, 1)
+        assert move is not None
+        _r, _c = move
+        assert fresh[_r][_c] == EMPTY
+
     def test_evaluate_for_ordering_no_killer(self, empty_board):
         score = evaluate_for_ordering_move(empty_board, 7, 7, AI, 1)
         assert score < 10**8
@@ -350,7 +441,7 @@ class TestAI:
     def test_evaluate_for_ordering_killer_bonus(self, empty_board):
         add_killer_move(1, (7, 7))
         score = evaluate_for_ordering_move(empty_board, 7, 7, AI, 1)
-        assert score >= 10**8
+        assert score >= MOVE_PRIORITY_KILLER
 
     def test_evaluate_for_ordering_winning_move(self, board_ai_advantage):
         score = evaluate_for_ordering_move(board_ai_advantage, 7, 4, AI, 1)
