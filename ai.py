@@ -11,7 +11,7 @@ killer_moves = {}
 IDS_TIME_LIMITS = {
     EASY: 0.2,
     MEDIUM: 2,
-    HARD: 6,
+    HARD: 5,
 }
 
 
@@ -265,4 +265,4 @@ def ai_move(board, level):
     elif level == MEDIUM:
         return find_best_move_by_ids(board, max_depth=2, time_limit=IDS_TIME_LIMITS[MEDIUM])
     # HARD
-    return find_best_move_by_ids(board, max_depth=4, time_limit=IDS_TIME_LIMITS[HARD])
+    return find_best_move_by_ids(board, max_depth=3, time_limit=IDS_TIME_LIMITS[HARD])

@@ -1,35 +1,6 @@
 from constants import BOARD_SIZE, EMPTY, PLAYER, AI, PATTERN_SCORES
 
 
-def count_overlapping(line, pattern):
-    count = 0
-    start = 0
-
-    while True:
-        idx = line.find(pattern, start)
-        if idx == -1:
-            break
-        count += 1
-        start = idx + 1
-
-    return count
-
-
-def normalize_line(line, player):
-    chars = ["#"]
-
-    for cell in line:
-        if cell == EMPTY:
-            chars.append(".")
-        elif cell == player:
-            chars.append("M")
-        else:
-            chars.append("E")
-
-    chars.append("#")
-    return "".join(chars)
-
-
 def get_all_lines(board):
     lines = []
 
@@ -86,90 +57,94 @@ def get_all_lines(board):
     return lines
 
 
+def _run_side(line, idx, player):
+    if idx < 0 or idx >= len(line):
+        return "#"
+
+    cell = line[idx]
+    if cell == EMPTY:
+        return "."
+    if cell == player:
+        return None
+    return "E"
+
+
 def evaluate_line_for_player(line, player):
-    s = normalize_line(line, player)
+    n = len(line)
     score = 0
+    runs = []
+    i = 0
 
-    score += count_overlapping(s, ".MMMMM.") * PATTERN_SCORES["FIVE"]
-    score += count_overlapping(s, "#MMMMM.") * PATTERN_SCORES["FIVE"]
-    score += count_overlapping(s, ".MMMMM#") * PATTERN_SCORES["FIVE"]
+    while i < n:
+        if line[i] == player:
+            start = i
+            while i < n and line[i] == player:
+                i += 1
+            runs.append((start, i - start))
+        else:
+            i += 1
 
-    score += count_overlapping(s, ".MMMM.") * PATTERN_SCORES["OPEN_FOUR"]
+    if not runs:
+        return 0
 
-    score += count_overlapping(s, "EMMMM.") * PATTERN_SCORES["SEMI_OPEN_FOUR"]
-    score += count_overlapping(s, ".MMMME") * PATTERN_SCORES["SEMI_OPEN_FOUR"]
-    score += count_overlapping(s, "#MMMM.") * PATTERN_SCORES["SEMI_OPEN_FOUR"]
-    score += count_overlapping(s, ".MMMM#") * PATTERN_SCORES["SEMI_OPEN_FOUR"]
+    for start, length in runs:
+        left = _run_side(line, start - 1, player)
+        right = _run_side(line, start + length, player)
 
-    broken_four_patterns = [
-        ".MMM.M.",
-        ".MM.MM.",
-        ".M.MMM."
-    ]
-    for p in broken_four_patterns:
-        score += count_overlapping(s, p) * PATTERN_SCORES["BROKEN_FOUR"]
+        both_open = left == "." and right == "."
+        one_open = (left == ".") != (right == ".")
 
-    semi_broken_four_patterns = [
-        "EMMM.M.",
-        ".MMM.ME",
-        "EMM.MM.",
-        ".MM.MME",
-        "EM.MMM.",
-        ".M.MMME",
-        "#MMM.M.",
-        ".MMM.M#",
-        "#MM.MM.",
-        ".MM.MM#",
-        "#M.MMM.",
-        ".M.MMM#"
-    ]
-    for p in semi_broken_four_patterns:
-        score += count_overlapping(s, p) * PATTERN_SCORES["SEMI_BROKEN_FOUR"]
+        if length >= 5:
+            if left != "E" and right != "E" and (left == "." or right == "."):
+                score += PATTERN_SCORES["FIVE"]
+        elif length == 4:
+            if both_open:
+                score += PATTERN_SCORES["OPEN_FOUR"]
+            elif one_open:
+                score += PATTERN_SCORES["SEMI_OPEN_FOUR"]
+        elif length == 3:
+            if both_open:
+                score += PATTERN_SCORES["OPEN_THREE"]
+            elif one_open:
+                score += PATTERN_SCORES["SEMI_OPEN_THREE"]
+        elif length == 2:
+            if both_open:
+                score += PATTERN_SCORES["OPEN_TWO"]
+            elif one_open:
+                score += PATTERN_SCORES["SEMI_OPEN_TWO"]
+        elif length == 1 and both_open:
+            score += PATTERN_SCORES["OPEN_ONE"]
 
-    score += count_overlapping(s, ".MMM.") * PATTERN_SCORES["OPEN_THREE"]
+    for run_idx in range(len(runs) - 1):
+        start1, len1 = runs[run_idx]
+        start2, len2 = runs[run_idx + 1]
+        gap = start2 - (start1 + len1)
 
-    broken_three_patterns = [
-        ".MM.M.",
-        ".M.MM."
-    ]
-    for p in broken_three_patterns:
-        score += count_overlapping(s, p) * PATTERN_SCORES["BROKEN_THREE"]
+        if gap != 1 or line[start1 + len1] != EMPTY:
+            continue
 
-    semi_open_three_patterns = [
-        "EMMM.",
-        ".MMME",
-        "#MMM.",
-        ".MMM#",
-        "EMM.M.",
-        ".MM.ME",
-        "EM.MM.",
-        ".M.MME",
-        "#MM.M.",
-        ".MM.M#",
-        "#M.MM.",
-        ".M.MM#"
-    ]
-    for p in semi_open_three_patterns:
-        score += count_overlapping(s, p) * PATTERN_SCORES["SEMI_OPEN_THREE"]
+        total = len1 + len2
+        left = _run_side(line, start1 - 1, player)
+        right = _run_side(line, start2 + len2, player)
 
-    score += count_overlapping(s, ".MM.") * PATTERN_SCORES["OPEN_TWO"]
+        both_open = left == "." and right == "."
+        one_open = (left == ".") != (right == ".")
 
-    score += count_overlapping(s, ".M.M.") * PATTERN_SCORES["BROKEN_TWO"]
-
-    semi_open_two_patterns = [
-        "EMM.",
-        ".MME",
-        "#MM.",
-        ".MM#",
-        "EM.M.",
-        ".M.ME",
-        "#M.M.",
-        ".M.M#"
-    ]
-    for p in semi_open_two_patterns:
-        score += count_overlapping(s, p) * PATTERN_SCORES["SEMI_OPEN_TWO"]
-
-    score += count_overlapping(s, ".M.") * PATTERN_SCORES["OPEN_ONE"]
+        if total == 4:
+            if both_open:
+                score += PATTERN_SCORES["BROKEN_FOUR"]
+            elif one_open:
+                score += PATTERN_SCORES["SEMI_BROKEN_FOUR"]
+        elif total == 3:
+            if both_open:
+                score += PATTERN_SCORES["BROKEN_THREE"]
+            elif one_open:
+                score += PATTERN_SCORES["SEMI_OPEN_THREE"]
+        elif total == 2:
+            if both_open:
+                score += PATTERN_SCORES["BROKEN_TWO"]
+            elif one_open:
+                score += PATTERN_SCORES["SEMI_OPEN_TWO"]
 
     return score
 
